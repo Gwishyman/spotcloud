@@ -1,9 +1,12 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
-// Firebase config
+// === CLOUDINARY CONFIG ===
+const cloudName = "dy078qdw0";
+const unsignedPreset = "unsigned_preset";
+
+// === FIREBASE CONFIG ===
 const firebaseConfig = {
   apiKey: "AIzaSyAiYRqZGkz4_uccAY7SFE7nLglhiIqxrzM",
   authDomain: "spotcloud-b84f0.firebaseapp.com",
@@ -16,14 +19,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app);
 
-// Redirect to login if not signed in
+// === DISCORD WEBHOOK (EXPOSED) ===
+const discordWebhook = "https://discord.com/api/webhooks/1375755451349864469/UI5o8syY75PCZh5lU7RNduWuTuqB9X0nIXX1j9yI5sqPu-E7Q95A3YbZvRVIBd5tDat0";
+
+// === REDIRECT IF NOT SIGNED IN ===
 onAuthStateChanged(auth, (user) => {
   if (!user) window.location.href = "login.html";
   else loadApprovedSongs();
 });
 
+// === HANDLE UPLOAD ===
 const uploadForm = document.getElementById("uploadForm");
 const songList = document.getElementById("songList");
 
@@ -35,58 +41,55 @@ uploadForm.addEventListener("submit", async (e) => {
   const file = document.getElementById("fileInput").files[0];
 
   if (!file || !/\.mp3$|\.wav$/i.test(file.name)) {
-    alert("Only MP3 or WAV files are allowed.");
+    alert("Only MP3 or WAV files allowed.");
     return;
   }
 
-  const filePath = `tracks/${Date.now()}_${file.name}`;
-  const fileRef = ref(storage, filePath);
-  await uploadBytes(fileRef, file);
-  const fileURL = await getDownloadURL(fileRef);
-
-  await addDoc(collection(db, "pending"), {
-    artist,
-    title,
-    fileURL,
-    uploadedAt: Date.now()
-  });
-
-  sendToDiscord(artist, title, fileURL);
-  alert("Upload submitted for moderation!");
-  uploadForm.reset();
-});
-
-// Base64 webhook decoding
-function decodeWebhook(b64) {
-  return atob(b64);
-}
-
-const base64Webhook = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTM3NTc1NTQ1MTM0OTg2NDQ2OS9VSTVvOHN5WTc1UENaaDVsdTdSTmR1V3VUdVE5WDBuSVhYMWo5eUk1c3FQdS1FN1E5NUEzWWJadlJWSUI1dERhdDA=";
-
-async function sendToDiscord(artist, title, fileURL) {
-  const webhook = decodeWebhook(base64Webhook);
-  const payload = {
-    content: `🎧 **New Track Uploaded!**\n**${title}** by *${artist}*`,
-    embeds: [
-      {
-        title: title,
-        description: `Uploaded by ${artist}`,
-        url: fileURL
-      }
-    ]
-  };
-
   try {
-    await fetch(webhook, {
+    // === UPLOAD TO CLOUDINARY ===
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", unsignedPreset);
+
+    const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+      method: "POST",
+      body: formData
+    });
+
+    const cloudData = await cloudRes.json();
+    const fileURL = cloudData.secure_url;
+
+    // === ADD TO FIRESTORE 'pending' ===
+    await addDoc(collection(db, "pending"), {
+      artist,
+      title,
+      fileURL,
+      uploadedAt: Date.now()
+    });
+
+    // === SEND TO DISCORD ===
+    await fetch(discordWebhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        content: `🎧 **New Track Uploaded!**\n**${title}** by *${artist}*`,
+        embeds: [{
+          title: title,
+          description: `Uploaded by ${artist}`,
+          url: fileURL
+        }]
+      })
     });
-  } catch (err) {
-    console.error("Failed to send to Discord:", err);
-  }
-}
 
+    alert("Upload submitted for moderation!");
+    uploadForm.reset();
+  } catch (err) {
+    console.error(err);
+    alert("Something went wrong.");
+  }
+});
+
+// === LOAD APPROVED TRACKS ===
 async function loadApprovedSongs() {
   const q = query(collection(db, "approved"), orderBy("uploadedAt", "desc"));
   const snap = await getDocs(q);
