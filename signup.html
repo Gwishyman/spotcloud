@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SpotCloud - Sign Up</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Create a SpotCloud Account</h1>
+  <input type="email" id="email" placeholder="Email" required>
+  <input type="password" id="password" placeholder="Password (6+ characters)" required>
+  <button id="signupBtn">Sign Up</button>
+  <p>Already have an account? <a href="login.html">Login here</a></p>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAiYRqZGkz4_uccAY7SFE7nLglhiIqxrzM",
+      authDomain: "spotcloud-b84f0.firebaseapp.com",
+      projectId: "spotcloud-b84f0",
+      storageBucket: "spotcloud-b84f0.appspot.com",
+      messagingSenderId: "331449666085",
+      appId: "1:331449666085:web:4911fccd73799b9dec0dcc"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    document.getElementById("signupBtn").addEventListener("click", async () => {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      try {
+        await createUserWithEmailAndPassword(auth, email, password);
+        window.location.href = "home.html";
+      } catch (error) {
+        alert("Signup failed: " + error.message);
+      }
+    });
+  </script>
+</body>
+</html>
