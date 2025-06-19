@@ -73,11 +73,19 @@ uploadForm.addEventListener("submit", async (e) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         content: `🎧 **New Track Uploaded!**\n**${title}** by *${artist}*`,
-        embeds: [{
-          title: title,
-          description: `Uploaded by ${artist}`,
-          url: fileURL
-        }]
+        embeds: [
+          {
+            title: title,
+            description: `Uploaded by ${artist}`,
+            url: fileURL,
+            fields: [
+              {
+                name: "Moderation",
+                value: `Manually review this track in Firestore:\n👉 [Go to Pending](https://console.firebase.google.com/project/spotcloud-b84f0/firestore/data/~2Fpending)`
+              }
+            ]
+          }
+        ]
       })
     });
 
@@ -85,7 +93,7 @@ uploadForm.addEventListener("submit", async (e) => {
     uploadForm.reset();
   } catch (err) {
     console.error(err);
-    alert("Something went wrong.");
+    alert("Something went wrong while uploading.");
   }
 });
 
@@ -99,7 +107,11 @@ async function loadApprovedSongs() {
     const { artist, title, fileURL } = doc.data();
     const div = document.createElement("div");
     div.className = "song";
-    div.innerHTML = `<strong>${title}</strong><br><em>${artist}</em><br><audio controls src="${fileURL}"></audio>`;
+    div.innerHTML = `
+      <strong>${title}</strong><br>
+      <em>${artist}</em><br>
+      <audio controls src="${fileURL}"></audio>
+    `;
     songList.appendChild(div);
   });
 }
